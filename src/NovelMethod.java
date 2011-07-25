@@ -23,7 +23,6 @@ import edu.stanford.nlp.process.*;
 
 import Jama.Matrix;
 
-// dat class...
 public class NovelMethod extends WikipediaExtender {
 
 	public static void main(String[] args) throws Exception {
@@ -34,76 +33,130 @@ public class NovelMethod extends WikipediaExtender {
 		super(wordnetPath, wikiPath);
 	}
 	
+	private TreeGraphNode getPOS(TreeGraphNode parent, String pos) {
+		TreeGraphNode[] children = parent.children();
+		for (int i=0; i<children.length; ++i)
+			if (children[i].value().equals(pos)) {
+				return children[i];
+			}
+			
+		return null;
+	}
+	
+	private String getAttribute(TreeGraphNode node, String attr) {
+		String map = node.label().toString("{map}");
+		String key = attr + "=";
+		
+		int start = map.indexOf(key) + key.length();
+		int end = map.indexOf(',', start);
+		if (end == -1) end = map.length()-1;
+		
+		return map.substring(start, end);
+	}
+	
+	private TreeGraphNode getHypernymNode(TreeGraphNode node) {
+		TreeGraphNode pre = node;
+		
+		// the main path is S (-> S) -> VP -> NP
+		
+		// go through the root (or quit if this was a bad parse)
+		pre = getPOS(node, "S");
+		if (pre == null) {
+			System.err.println("Skipping because the article does not begin with a sentence.");
+			return null;
+		} else node = pre;
+		
+		// sometimes there are two S's in a row at the top
+		pre = getPOS(node, "S");
+		if (pre != null) node = pre;
+		
+		// get the predicate
+		pre = getPOS(node, "VP");
+		if (pre == null) {
+			System.err.println("Skipping because the sentence does not have a predicate.");
+			return null;
+		} else node = pre;
+		
+		// get the object phrase
+		pre = getPOS(node, "NP");
+		if (pre == null) {
+			pre = getPOS(node, "VP"); // try S -> VP -> VP -> NP
+			
+			
+			if (pre == null) {
+				pre = getPOS(node, "S"); // try S -> VP -> S -> VP -> NP
+				
+				if (pre == null) {
+					System.err.println("Skipping because the sentence's predicate does not have an object.");
+					return null;
+				} else node = pre;
+				
+				pre = getPOS(node, "VP");
+				if (pre == null) {
+					System.err.println("Skipping because the sentence does not have a deeper predicate.");
+					return null;
+				} else node = pre;
+				
+			} else node = pre;
+			
+			
+			pre = getPOS(node, "NP");
+			if (pre == null) {
+				System.err.println("Skipping because the sentence's deeper predicate does not have an object.");
+				return null;
+			} else node = pre;
+				
+		} else node = pre;
+		
+		// now we have the NP
+		// check if there is an 'of' preposition
+
+		pre = getPOS(node, "PP");
+		while (pre != null && getAttribute(pre, "TextAnnotation").equals("of")) {
+		
+			// the sentence is written as "[title] is a [order, class, series, etc] of [real hypernym]..."
+			// so we need to go deeper
+		
+			node = pre;
+			pre = getPOS(node, "NP");
+			if (pre == null) {
+				System.err.println("Skipping because the prepositional phrase has no object.");
+				return null;
+			} else node = pre;
+			
+			pre = getPOS(node, "PP");
+		}
+		return node;
+	}
+	
 	public void handlePage(WikiPage page) {
 		
 		if (page.isDisambiguationPage() || page.isRedirect()) return;
 		
 		String title = page.getTitle();
+		title = title.substring(0, title.indexOf('\n'));
+		System.err.println(title);
 		if (dict.getIndexWord(title, POS.NOUN) != null) {
-			System.err.println("Skipping " + page.getTitle() + " because it is already in WordNet.");
+			System.err.println("Skipping because it is already in WordNet.");
 			return;
 		}
 		++added;
 		
 		String text = getPlainText(page.getWikiText());
 		String sent = firstSentence(text);
-		System.out.print("\n" + title);
-		//System.out.println(sent);
+		System.out.println("\n" + title);
 		
-		///*
-		Tree np = parser.apply(sent);
+		Tree tree = parser.apply(sent);
+		GrammaticalStructure gs = gsf.newGrammaticalStructure(tree);
+		TreeGraphNode node = getHypernymNode(gs.root());
 		
-		GrammaticalStructure gs = gsf.newGrammaticalStructure(np);
-		System.out.println(gs);
-		inspect(gs.root());
-		return;/*
-		boolean success = false;
-		TreeGraphNode node = gs.root();
-		TreeGraphNode[] children = node.children();
-		for (int i=0; i<children.length && !success; ++i)
-			if (children[i].value().equals("S")) {
-				node = children[i];
-				success = true;
-			}
-			
-		if (!success) {
-			System.err.println("Skipping " + page.getTitle() + " because it does not begin with a sentence.");
-			return;
-		}
-		success = false;
-		children = node.children();
-		
-		for (int i=0; i<children.length && !success; ++i)
-			if (children[i].value().equals("VP")) {
-				node = children[i];
-				success = true;
-			}
-			
-		if (!success) {
-			System.err.println("Skipping " + page.getTitle() + " because it does not have a verb phrase.");
-			return;
-		}
-		success = false;
-		children = node.children();
-		
-		for (int i=0; i<children.length && !success; ++i)
-			if (children[i].value().equals("NP")) {
-				node = children[i];
-				success = true;
-			}
-			
-		if (!success) {
-			System.err.println("Skipping " + page.getTitle() + " because it does not have an object of the verb phrase in its first sentence.");
+		if (node == null) {
+			System.err.println(sent);
+			inspect(gs);
 			return;
 		}
 		
-		String map = node.label().toString("{map}");
-		String key = "HeadWordAnnotation=";
-		int start = map.indexOf(key) + key.length();
-		int end = map.indexOf(',', start);
-		if (end == -1) end = map.length()-1;
-					
-		String word = map.substring(start, end);
+		String word = getAttribute(node, "HeadWordAnnotation");
 		while (word.length()>0 && ((word.charAt(word.length()-1) >= '0' && word.charAt(word.length()-1) <= '9') ||
 				word.charAt(word.length()-1) == '-'))
 			word = word.substring(0, word.length()-1);
@@ -135,11 +188,16 @@ public class NovelMethod extends WikipediaExtender {
 		if (best != null) for (IWord iword : best.getWords()) System.out.print(iword.getLemma() + ", ");
 		else System.out.println("" + word + "(not found in WordNet)");
 		
-		System.out.println();
-		if (added%50==0) System.err.println(added);*/
+		System.out.println('\n');
+		System.out.println(sent);
+		inspect(gs);
+		
+		if (added%50==0) System.err.println(added);
 	}
 	
-	public void inspect(TreeGraphNode node) {
+	public void inspect(GrammaticalStructure gs) {
+		System.err.println(gs);
+		TreeGraphNode node = gs.root();
 		Scanner in = new Scanner(System.in);
 		boolean stop = false;
 		
