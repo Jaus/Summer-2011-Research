@@ -23,7 +23,6 @@ import edu.stanford.nlp.process.*;
 
 import Jama.Matrix;
 
-// dat class...
 public class JiangMethod extends WikipediaExtender {
 
 	public static void main(String[] args) throws Exception {
