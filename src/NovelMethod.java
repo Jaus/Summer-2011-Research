@@ -25,6 +25,8 @@ import Jama.Matrix;
 
 public class NovelMethod extends WikipediaExtender {
 
+	long seen = 0;
+
 	public static void main(String[] args) throws Exception {
 		new NovelMethod("/usr/local/WordNet-3.0/dict", args[0]).run();
 	}
@@ -111,6 +113,7 @@ public class NovelMethod extends WikipediaExtender {
 		// now we have the NP
 		// check if there is an 'of' preposition
 
+		TreeGraphNode backup = node;
 		pre = getPOS(node, "PP");
 		while (pre != null && getAttribute(pre, "TextAnnotation").equals("of")) {
 		
@@ -120,8 +123,12 @@ public class NovelMethod extends WikipediaExtender {
 			node = pre;
 			pre = getPOS(node, "NP");
 			if (pre == null) {
-				System.err.println("Skipping because the prepositional phrase has no object.");
-				return null;
+				//System.err.println("Skipping because the prepositional phrase has no object.");
+				//return null;
+				
+				// it's more correct to bail to the original node in this situation...
+				node = backup;
+				break;
 			} else node = pre;
 			
 			pre = getPOS(node, "PP");
@@ -130,6 +137,7 @@ public class NovelMethod extends WikipediaExtender {
 	}
 	
 	public void handlePage(WikiPage page) {
+		++seen;
 		
 		if (page.isDisambiguationPage() || page.isRedirect()) return;
 		
@@ -151,23 +159,44 @@ public class NovelMethod extends WikipediaExtender {
 		TreeGraphNode node = getHypernymNode(gs.root());
 		
 		if (node == null) {
-			System.err.println(sent);
-			inspect(gs);
+			//System.err.println(sent);
+			//inspect(gs);
 			return;
 		}
 		
+		int wordIndex = 0;
+		int place = 1;
 		String word = getAttribute(node, "HeadWordAnnotation");
-		while (word.length()>0 && ((word.charAt(word.length()-1) >= '0' && word.charAt(word.length()-1) <= '9') ||
-				word.charAt(word.length()-1) == '-'))
+		System.err.println(word);
+		while (word.length()>0 && word.charAt(word.length()-1) >= '0' && word.charAt(word.length()-1) <= '9') {
+			wordIndex = wordIndex + (word.charAt(word.length()-1) - '0')*place;
 			word = word.substring(0, word.length()-1);
+			place *= 10;
+		}
+		if (word.charAt(word.length()-1) == '-') word = word.substring(0, word.length()-1);
+		--wordIndex;
+		
+		ArrayList wordList = tree.yieldWords();
+		StringBuilder candidate = new StringBuilder(word);
 			
 		ISynset best = null;
 		double bestScore = -1.0;
 		String bestCandidate = "";
 		
-		// take a word and find its index word in WordNet
-		IIndexWord index = null;
-		if (word.length() > 0) index = dict.getIndexWord(word, POS.NOUN);
+		IIndexWord index = null, tryIndex = null;
+		if (word.length() > 0) tryIndex = dict.getIndexWord(candidate.toString(), POS.NOUN);
+		index = tryIndex;
+		
+		// find the longest phrase ending in the targeted hypernym that appears in WordNet
+		while (tryIndex != null && wordIndex > 0) {
+			index = tryIndex;
+			
+			candidate.insert(0, " ");
+			candidate.insert(0, ((CoreLabel)(wordList.get(--wordIndex))).word());
+			System.err.println("Trying: " + candidate.toString());
+			tryIndex = dict.getIndexWord(candidate.toString(), POS.NOUN);
+		}
+		
 		if (index != null) {
 
 			// find all the synsets associated with that index and score them
@@ -189,10 +218,11 @@ public class NovelMethod extends WikipediaExtender {
 		else System.out.println("" + word + "(not found in WordNet)");
 		
 		System.out.println('\n');
-		System.out.println(sent);
-		inspect(gs);
+		//System.err.println(sent);
+		//inspect(gs);
 		
 		if (added%50==0) System.err.println(added);
+		if (seen%100==0) System.err.println(seen);
 	}
 	
 	public void inspect(GrammaticalStructure gs) {
