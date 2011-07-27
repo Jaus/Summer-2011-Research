@@ -123,10 +123,7 @@ public class NovelMethod extends WikipediaExtender {
 			node = pre;
 			pre = getPOS(node, "NP");
 			if (pre == null) {
-				//System.err.println("Skipping because the prepositional phrase has no object.");
-				//return null;
-				
-				// it's more correct to bail to the original node in this situation...
+				// bail to the original node in this situation
 				node = backup;
 				break;
 			} else node = pre;
@@ -136,32 +133,13 @@ public class NovelMethod extends WikipediaExtender {
 		return node;
 	}
 	
-	public void handlePage(WikiPage page) {
-		++seen;
-		
-		if (page.isDisambiguationPage() || page.isRedirect()) return;
-		
-		String title = page.getTitle();
-		title = title.substring(0, title.indexOf('\n'));
-		System.err.println(title);
-		if (dict.getIndexWord(title, POS.NOUN) != null) {
-			System.err.println("Skipping because it is already in WordNet.");
-			return;
-		}
-		++added;
-		
-		String text = getPlainText(page.getWikiText());
-		String sent = firstSentence(text);
-		System.out.println("\n" + title);
-		
-		Tree tree = parser.apply(sent);
-		GrammaticalStructure gs = gsf.newGrammaticalStructure(tree);
+	public String parseTreeHypernym(String sentence) {
+		Tree tree = parser().apply(sentence);
+		GrammaticalStructure gs = gsFactory().newGrammaticalStructure(tree);
 		TreeGraphNode node = getHypernymNode(gs.root());
 		
 		if (node == null) {
-			//System.err.println(sent);
-			//inspect(gs);
-			return;
+			return null;
 		}
 		
 		int wordIndex = 0;
@@ -176,50 +154,58 @@ public class NovelMethod extends WikipediaExtender {
 		if (word.charAt(word.length()-1) == '-') word = word.substring(0, word.length()-1);
 		--wordIndex;
 		
+		// normalize word
+		word = Morphology.lemmatizeStatic(new WordTag(word)).lemma();
+		
 		ArrayList wordList = tree.yieldWords();
 		StringBuilder candidate = new StringBuilder(word);
-			
-		ISynset best = null;
-		double bestScore = -1.0;
-		String bestCandidate = "";
+		String hyp = candidate.toString();
 		
-		IIndexWord index = null, tryIndex = null;
-		if (word.length() > 0) tryIndex = dict.getIndexWord(candidate.toString(), POS.NOUN);
-		index = tryIndex;
+		IIndexWord index = null;
+		if (word.length() > 0) index = dict().getIndexWord(candidate.toString(), POS.NOUN);
 		
 		// find the longest phrase ending in the targeted hypernym that appears in WordNet
-		while (tryIndex != null && wordIndex > 0) {
-			index = tryIndex;
+		while (index != null && wordIndex > 0) {
+			hyp = candidate.toString();
 			
 			candidate.insert(0, " ");
 			candidate.insert(0, ((CoreLabel)(wordList.get(--wordIndex))).word());
-			System.err.println("Trying: " + candidate.toString());
-			tryIndex = dict.getIndexWord(candidate.toString(), POS.NOUN);
+			index = dict().getIndexWord(candidate.toString(), POS.NOUN);
 		}
 		
-		if (index != null) {
-
-			// find all the synsets associated with that index and score them
-			System.err.println("" + index.getWordIDs().size() + " synsets");
-			for (IWordID wordId : index.getWordIDs()) {
-				ISynset concept = dict.getSynset(wordId.getSynsetID());
-				double score = match(firstParagraph(page.getText()), concept.getGloss());
-				System.err.println("Score: " + score);
-				if (score > bestScore) {
-					best = concept;
-					bestScore = score;
-					bestCandidate = word;
-				}
-			}
+		return hyp;
+	}
+	
+	public void handlePage(WikiPage page) {
+		++seen;
+		
+		if (page.isDisambiguationPage() || page.isRedirect()) return;
+		
+		String title = page.getTitle();
+		title = title.substring(0, title.indexOf('\n'));
+		System.err.println(title);
+		if (dict().getIndexWord(title, POS.NOUN) != null) {
+			System.err.println("Skipping because it is already in WordNet.");
+			return;
 		}
+		++added;
+		
+		System.out.println("\n" + title);
+		String text = getPlainText(page.getWikiText());
+		String word = parseTreeHypernym(firstSentence(text));
+		
+		if (word == null) {
+			System.err.println("No hypernym found.");
+			return;
+		}
+		
+		ResultPair result = bestMatch(Arrays.asList(word), firstParagraph(page.getText()));
 			
 		System.out.print("-> ");
-		if (best != null) for (IWord iword : best.getWords()) System.out.print(iword.getLemma() + ", ");
+		if (result != null) for (IWord iword : result.synset().getWords()) System.out.print(iword.getLemma() + ", ");
 		else System.out.println("" + word + "(not found in WordNet)");
 		
 		System.out.println('\n');
-		//System.err.println(sent);
-		//inspect(gs);
 		
 		if (added%50==0) System.err.println(added);
 		if (seen%100==0) System.err.println(seen);

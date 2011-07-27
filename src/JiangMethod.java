@@ -54,7 +54,7 @@ public class JiangMethod extends WikipediaExtender {
 		// ** phase 1 ** //
 		for (String category : page.getCategories()) {
 			try {
-				if (dict.getIndexWord(category, POS.NOUN) != null) candidates.add(category);
+				if (dict().getIndexWord(category, POS.NOUN) != null) candidates.add(category);
 			} catch (IllegalArgumentException e) {e.printStackTrace();}
 		}
 		
@@ -64,64 +64,41 @@ public class JiangMethod extends WikipediaExtender {
 
 			for (String category : page.getCategories()) {
 				Tree np = parser().apply(category+" are cool.");
-				//System.out.println(category+" are cool.");
 				
 				GrammaticalStructure gs = gsFactory().newGrammaticalStructure(np);
 				Collection<TypedDependency> tds = gs.typedDependenciesCollapsed();
 				Iterator<TypedDependency> iter = tds.iterator();
-				//System.out.println(tds);
 				
 				while (iter.hasNext()) {
 					TypedDependency t = iter.next();
 					String head = Morphology.lemmatizeStatic(new WordTag(t.dep().value())).lemma();
-					if (t.gov().value().equals("cool") && !head.equals("are") && dict.getIndexWord(head, POS.NOUN) != null) {
+					if (t.gov().value().equals("cool") && !head.equals("are") && dict().getIndexWord(head, POS.NOUN) != null) {
 						headTerms.put(head, category);
 						candidates.add(head);
-						//System.out.println(t.reln().getShortName() + "(" + t.gov().value() + ", " + head + ")");
-						//break;
 					}
 				}
-				//System.out.println();
 			}
 		}
 		
-		//System.out.println(page.getCategories());
 		if (candidates.size() == 0) {
 			System.err.println("Skipping " + page.getTitle() + " because no legal candidates were found.");
 			return;
 		}
-		// ** determine best concept match ** //
-		ISynset best = null;
-		double bestScore = -1.0;
-		String bestCandidate = "";
-		System.err.println("" + candidates.size() + " candidates");
-		for (String word : candidates) {
-			// take a word and find its index word in WordNet
-			IIndexWord index = dict().getIndexWord(word, POS.NOUN);
-
-			// find all the synsets associated with that index and score them
-			System.err.println("" + index.getWordIDs().size() + " synsets");
-			for (IWordID wordId : index.getWordIDs()) {
-				ISynset concept = dict().getSynset(wordId.getSynsetID());
-				double score = match(firstParagraph(page.getText()), concept.getGloss());
-				System.err.println("Score: " + score);
-				if (score > bestScore) {
-					best = concept;
-					bestScore = score;
-					bestCandidate = word;
-				}
-			}
-		}
 		
-		if (best == null) {
+		// ** determine best concept match ** //
+		String compText = firstParagraph(page.getText());
+		ResultPair result = bestMatch(candidates, compText);
+		
+		if (result == null) {
 			System.err.println("Skipping " + page.getTitle() + " because there's no text in the body.");
 			return;
 		}
+		
 		// ** report results ** //
 		System.out.print(page.getTitle() + "-> ");
-		if (phase2) System.out.print(headTerms.get(bestCandidate) + " -> ");
+		if (phase2) System.out.print(headTerms.get(result.word()) + " -> ");
 		
-		for (IWord word : best.getWords()) System.out.print(word.getLemma() + ", ");
+		for (IWord word : result.synset().getWords()) System.out.print(word.getLemma() + ", ");
 		System.out.println("\n");
 	}
 }

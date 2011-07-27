@@ -30,11 +30,11 @@ public class WikipediaExtender {
 	
 	public static final List<String> acronyms = Arrays.asList("Inc", "No", "ca", "lat");
 
-	edu.mit.jwi.Dictionary dict;
-	LexicalizedParser parser;
-	TreebankLanguagePack tlp;
-	GrammaticalStructureFactory gsf;
-	WikiXMLParser wxsp;
+	private edu.mit.jwi.Dictionary dict;
+	private LexicalizedParser parser;
+	private TreebankLanguagePack tlp;
+	private GrammaticalStructureFactory gsf;
+	private WikiXMLParser wxsp;
 	
 	POS[] posList;
 
@@ -88,6 +88,34 @@ public class WikipediaExtender {
 		wxsp.parse();
 	}
 	
+	public ResultPair bestMatch(List<String> candidates, String compText) {
+		ISynset best = null;
+		double bestScore = -1.0;
+		String bestCandidate = "";
+		System.err.println("" + candidates.size() + " candidates");
+		
+		for (String word : candidates) {
+			// take a word and find its index word in WordNet
+			IIndexWord index = dict().getIndexWord(word, POS.NOUN);
+
+			// find all the synsets associated with that index and score them
+			System.err.println("" + index.getWordIDs().size() + " synsets");
+			for (IWordID wordId : index.getWordIDs()) {
+				ISynset concept = dict().getSynset(wordId.getSynsetID());
+				double score = match(compText, concept.getGloss());
+				System.err.println("Score: " + score);
+				if (score > bestScore) {
+					best = concept;
+					bestScore = score;
+					bestCandidate = word;
+				}
+			}
+		}
+		
+		if (best == null) return null;
+		return new ResultPair(best, bestCandidate);
+	}
+	
 	public double match(String p, String s) {
 	
 		Set<ISynset> pConcepts = new HashSet<ISynset>();
@@ -108,7 +136,6 @@ public class WikipediaExtender {
 				pConcepts.add(concept);
 				total.add(concept);
 			}
-			
 		}
 		
 		// ** get all concepts from the synset gloss ** //
@@ -125,11 +152,12 @@ public class WikipediaExtender {
 				sConcepts.add(concept);
 				total.add(concept);
 			}
-			
 		}
 		
 		// ** build v1 and v2 vectors from p and s ** //
 		int size = total.size();
+		if (size == 0) return 0.0;
+		
 		double[] v1 = new double[size];
 		double[] v2 = new double[size];
 		List<ISynset> conceptList = new LinkedList<ISynset>();
