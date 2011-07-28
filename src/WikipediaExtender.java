@@ -117,7 +117,7 @@ public abstract class WikipediaExtender {
 			dict = new edu.mit.jwi.Dictionary(url);
 			try {dict.open();}
 			catch (IOException e) {e.printStackTrace();}
-		}
+		} else dict = d;
 		
 		if (wikipediapath != null) {
 			wxsp = WikiXMLParserFactory.getSAXParser(wikipediapath);
@@ -240,6 +240,7 @@ public abstract class WikipediaExtender {
 				else sm[i][j] = sim(conceptList.get(i), conceptList.get(j));
 			}
 		}
+		System.err.println();
 		
 		// ** compute final similarity score ** //
 		Matrix mv1 = new Matrix(v1, 1),
