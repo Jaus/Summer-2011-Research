@@ -12,8 +12,6 @@ import edu.mit.jwi.item.IWordID;
 import edu.mit.jwi.item.IIndexWord;
 import edu.mit.jwi.item.POS;
 
-import jsl.tools.JWITools;
-
 import edu.jhu.nlp.wikipedia.*;
 
 import edu.stanford.nlp.parser.lexparser.*;
@@ -21,11 +19,7 @@ import edu.stanford.nlp.trees.*;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.process.*;
 
-import Jama.Matrix;
-
 public class NovelMethod extends WikipediaExtender {
-
-	long seen = 0;
 
 	public static void main(String[] args) throws Exception {
 		new NovelMethod("/usr/local/WordNet-3.0/dict", args[0]).run();
@@ -33,6 +27,10 @@ public class NovelMethod extends WikipediaExtender {
 	
 	public NovelMethod(String wordnetPath, String wikiPath) {
 		super(wordnetPath, wikiPath);
+	}
+	
+	public NovelMethod(String wordnetpath, String wikipediapath, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
+		super(wordnetpath, wikipediapath, d, p, g);
 	}
 	
 	private TreeGraphNode getPOS(TreeGraphNode parent, String pos) {
@@ -145,7 +143,6 @@ public class NovelMethod extends WikipediaExtender {
 		int wordIndex = 0;
 		int place = 1;
 		String word = getAttribute(node, "HeadWordAnnotation");
-		System.err.println(word);
 		while (word.length()>0 && word.charAt(word.length()-1) >= '0' && word.charAt(word.length()-1) <= '9') {
 			wordIndex = wordIndex + (word.charAt(word.length()-1) - '0')*place;
 			word = word.substring(0, word.length()-1);
@@ -176,39 +173,19 @@ public class NovelMethod extends WikipediaExtender {
 		return hyp;
 	}
 	
-	public void handlePage(WikiPage page) {
-		++seen;
-		
-		if (page.isDisambiguationPage() || page.isRedirect()) return;
-		
-		String title = page.getTitle();
-		title = title.substring(0, title.indexOf('\n'));
-		System.err.println(title);
-		if (dict().getIndexWord(title, POS.NOUN) != null) {
-			System.err.println("Skipping because it is already in WordNet.");
-			return;
-		}
-		++added;
-		
-		System.out.println("\n" + title);
+	public ResultPair determineHypernym(WikiPage page) {
 		String text = getPlainText(page.getWikiText());
 		String word = parseTreeHypernym(firstSentence(text));
 		
 		if (word == null) {
 			System.err.println("No hypernym found.");
-			return;
+			return null;
 		}
 		
 		ResultPair result = bestMatch(Arrays.asList(word), firstParagraph(page.getText()));
-			
-		System.out.print("-> ");
-		if (result != null) for (IWord iword : result.synset().getWords()) System.out.print(iword.getLemma() + ", ");
-		else System.out.println("" + word + "(not found in WordNet)");
 		
-		System.out.println('\n');
-		
-		if (added%50==0) System.err.println(added);
-		if (seen%100==0) System.err.println(seen);
+		if (result != null) return new ResultPair(result.synset(), null);
+		else return new ResultPair(null, word);
 	}
 	
 	public void inspect(GrammaticalStructure gs) {

@@ -24,7 +24,7 @@ import edu.stanford.nlp.process.*;
 import Jama.Matrix;
 
 // dat class...
-public class WikipediaExtender {
+public abstract class WikipediaExtender {
 
 	public static final String GRAMMAR_FILE = "/home/jaus/Documents/Java/stanford-parser-2011-06-19/grammar/englishFactored.ser.gz";
 	
@@ -38,49 +38,100 @@ public class WikipediaExtender {
 	
 	POS[] posList;
 
-	long added;
+	long added, seen;
 	int MAX_DEPTH = 16;
 	
 	public edu.mit.jwi.Dictionary dict() {return dict;}
 	public LexicalizedParser parser() {return parser;}
 	public GrammaticalStructureFactory gsFactory() {return gsf;}
 	
-	// left blank to be overridden
-	public void handlePage(WikiPage page) {}
+	// this is overridden based on the method
+	public abstract ResultPair determineHypernym(WikiPage page);
+	
+	public void handlePage(WikiPage page) {
+		++seen;
+		
+		if (page.isDisambiguationPage() || page.isRedirect()) return;
+		
+		String title = page.getTitle();
+		title = title.substring(0, title.indexOf('\n'));
+		System.err.println(title);
+		if (dict().getIndexWord(title, POS.NOUN) != null) {
+			System.err.println("Skipping because it is already in WordNet.");
+			return;
+		}
+		
+		ResultPair result = determineHypernym(page);
+		if (result == null) {
+			System.err.println("Something went wrong...");
+			return;
+		}
+		
+		// ** report results ** //
+		System.out.print(title + " -> ");
+		if (result.synset() == null) System.out.print(result.word() + " (not found in WordNet)");
+		else {
+			if (result.word() != null) System.out.print(result.word() + " -> ");
+		
+			for (IWord word : result.synset().getWords()) System.out.print(word.getLemma() + ", ");
+			System.out.println("\n");
+		}
+		
+		++added;
+		
+		if (added%50==0) System.err.println("Added: " + added);
+		if (seen%50==0)  System.err.println("Seen:  " + seen);
+	}
 	
 	public WikipediaExtender(String wordnetpath, String wikipediapath) {
+		this(wordnetpath, wikipediapath, null, null, null);
+	}
+	
+	// pass in an existing copy of these resources to skip initialization
+	// null for wikipedia path causes the main loop to be suppressed
+	public WikipediaExtender(String wordnetpath, String wikipediapath, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
+	
 		added = 0;
+		seen = 0;
 		posList = new POS[]{POS.NOUN, POS.VERB, POS.ADJECTIVE, POS.ADVERB};
 		
 		// prepare lexicalized parser
-		parser = new LexicalizedParser(GRAMMAR_FILE);
-		parser.setOptionFlags(new String[]{"-outputFormat", "typedDependencies"});
-		tlp = new PennTreebankLanguagePack();
-		gsf = tlp.grammaticalStructureFactory();
+		if (p == null) {
+			parser = new LexicalizedParser(GRAMMAR_FILE);
+			parser.setOptionFlags(new String[]{"-outputFormat", "typedDependencies"});
+		} else parser = p;
+		
+		// prepare gsf
+		if (g == null) {
+			tlp = new PennTreebankLanguagePack();
+			gsf = tlp.grammaticalStructureFactory();
+		} else gsf = g;
 	
 		// prepare WordNet
-		URL url = null;
-		try {url = new URL("file", null, wordnetpath);} 
-		catch (MalformedURLException e) {e.printStackTrace();}
-		if (url == null) return;
+		if (d == null) {
+			URL url = null;
+			try {url = new URL("file", null, wordnetpath);} 
+			catch (MalformedURLException e) {e.printStackTrace();}
+			if (url == null) return;
 		
-		dict = new edu.mit.jwi.Dictionary(url);
-		try {dict.open();}
-		catch (IOException e) {e.printStackTrace();}
+			dict = new edu.mit.jwi.Dictionary(url);
+			try {dict.open();}
+			catch (IOException e) {e.printStackTrace();}
+		}
 		
-		wxsp = WikiXMLParserFactory.getSAXParser(wikipediapath);
+		if (wikipediapath != null) {
+			wxsp = WikiXMLParserFactory.getSAXParser(wikipediapath);
 		
-		try {
-
-			wxsp.setPageCallback(new PageCallbackHandler() { 
-				public void process(WikiPage page) {
-					handlePage(page);
-				}
-			});
+			try {
+				wxsp.setPageCallback(new PageCallbackHandler() { 
+					public void process(WikiPage page) {
+						handlePage(page);
+					}
+				});
 			
-		} catch(Exception e) {
-		
-			e.printStackTrace();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
 		}
 	}
 	
@@ -92,11 +143,12 @@ public class WikipediaExtender {
 		ISynset best = null;
 		double bestScore = -1.0;
 		String bestCandidate = "";
-		System.err.println("" + candidates.size() + " candidates");
+		System.err.println("Candidates: " + candidates.size());
 		
 		for (String word : candidates) {
 			// take a word and find its index word in WordNet
 			IIndexWord index = dict().getIndexWord(word, POS.NOUN);
+			if (index == null) continue;
 
 			// find all the synsets associated with that index and score them
 			System.err.println("" + index.getWordIDs().size() + " synsets");

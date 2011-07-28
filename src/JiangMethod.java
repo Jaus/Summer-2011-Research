@@ -12,16 +12,12 @@ import edu.mit.jwi.item.IWordID;
 import edu.mit.jwi.item.IIndexWord;
 import edu.mit.jwi.item.POS;
 
-import jsl.tools.JWITools;
-
 import edu.jhu.nlp.wikipedia.*;
 
 import edu.stanford.nlp.parser.lexparser.*;
 import edu.stanford.nlp.trees.*;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.process.*;
-
-import Jama.Matrix;
 
 public class JiangMethod extends WikipediaExtender {
 
@@ -33,21 +29,14 @@ public class JiangMethod extends WikipediaExtender {
 		super(wordnetPath, wikiPath);
 	}
 	
-	public void handlePage(WikiPage page) {
-		if (page.getCategories().size()==0) {
-			System.err.println("Skipping " + page.getTitle() + " because it has no categories.");
-			return;
-		}
+	public JiangMethod(String wordnetpath, String wikipediapath, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
+		super(wordnetpath, wikipediapath, d, p, g);
+	}
+	
+	public ResultPair determineHypernym(WikiPage page) {
 	
 		Map<String, String> headTerms = new HashMap<String, String>();
 		boolean phase2 = false;
-		
-		String title = page.getTitle();
-		if (dict().getIndexWord(title, POS.NOUN) != null) {
-			System.err.println("Skipping " + page.getTitle() + " because it is already in WordNet.");
-			return;
-		}
-		++added;
 		
 		ArrayList<String> candidates = new ArrayList<String>();
 		
@@ -82,7 +71,7 @@ public class JiangMethod extends WikipediaExtender {
 		
 		if (candidates.size() == 0) {
 			System.err.println("Skipping " + page.getTitle() + " because no legal candidates were found.");
-			return;
+			return null;
 		}
 		
 		// ** determine best concept match ** //
@@ -91,14 +80,10 @@ public class JiangMethod extends WikipediaExtender {
 		
 		if (result == null) {
 			System.err.println("Skipping " + page.getTitle() + " because there's no text in the body.");
-			return;
+			return null;
 		}
 		
-		// ** report results ** //
-		System.out.print(page.getTitle() + "-> ");
-		if (phase2) System.out.print(headTerms.get(result.word()) + " -> ");
-		
-		for (IWord word : result.synset().getWords()) System.out.print(word.getLemma() + ", ");
-		System.out.println("\n");
+		if (phase2) return new ResultPair(result.synset(), headTerms.get(result.word()));
+		else return new ResultPair(result.synset(), null);
 	}
 }
