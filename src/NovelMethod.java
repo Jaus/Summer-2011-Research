@@ -148,6 +148,10 @@ public class NovelMethod extends WikipediaExtender {
 			word = word.substring(0, word.length()-1);
 			place *= 10;
 		}
+		if (word.length()==0) {
+			System.err.println("No word found...");
+			return null;
+		}
 		if (word.charAt(word.length()-1) == '-') word = word.substring(0, word.length()-1);
 		--wordIndex;
 		

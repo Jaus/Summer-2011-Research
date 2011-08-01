@@ -20,7 +20,7 @@ public class HybridMethod extends WikipediaExtender {
 		ResultPair novel = novelMethod.determineHypernym(page);
 		ResultPair jiang = jiangMethod.determineHypernym(page);
 		
-		if (novel == null) return jiang;
+		if (novel == null || novel.synset() == null) return jiang;
 		else if (jiang == null) return novel;
 		else {
 			String compText = firstParagraph(page.getText());
