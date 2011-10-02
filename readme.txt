@@ -1,5 +1,33 @@
-To compile:
-javac -cp lib/wikixmlj-r43.jar:lib/Jama-1.0.2.jar:lib/stanford-parser.jar:lib/jsimlib.jar -sourcepath src -d classes src/ExtendWikipedia.java
+I'll be updating this readme with more detailed information later.
 
-To run:
-java -cp classes:lib/ant.jar:lib/wikixmlj-r43.jar:lib/Jama-1.0.2.jar:lib/stanford-parser.jar:lib/jsimlib.jar ExtendWikipedia data/enwiki-latest-pages-articles.xml.bz2
+
+** How to Run **
+
+	I have included run and compile commands in the script/ directory. script/run takes
+two arguments: the class name that you want to run and whether to skip named entities
+or not (1 to skip, 0 not to). The programs print information to stderr that is not part
+of the final output, so you should redirect stdout to a file to get clean output For
+example, to run the hybrid method skipping named entities you would enter:
+
+	> script/run HybridMethod 1 > /path/to/output/file.txt
+
+	You will have to edit script/run to use the correct path to the Wikipedia dump file
+on your system. I have not included the dump file in the project because of size concerns.
+The path should go in between the "$1" and "$2" in the script.
+
+	You can also edit the amount of memory reserved for the JVM using the -Xmx option. I
+had to reduce it from the 3.5G it was using previously because my poor laptop only has 2G;
+you may want to raise the memory limit back.
+
+	If you change the code, compiling is easy. Simply invoke script/compile with the path
+of the source file. E.g:
+
+	> script/compile src/DummyMethod.java
+
+
+** Relevant Source Files **
+
+	There are several files in src/ that are not really relevant that I haven't removed
+yet. The main files are WikipediaExtender.java, JiangMethod.java, NovelMethod.java, and
+HybridMethod.java. All of the *Method classes can be invoked using script/run. I'll do
+some garbage collection of the unused files soon :)

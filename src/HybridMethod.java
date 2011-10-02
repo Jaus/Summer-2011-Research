@@ -6,14 +6,14 @@ public class HybridMethod extends WikipediaExtender {
 	private JiangMethod jiangMethod;
 
 	public static void main(String[] args) throws Exception {
-		new HybridMethod("/usr/local/WordNet-3.0/dict", args[0]).run();
+		new HybridMethod(args[0], Integer.valueOf(args[1])>0).run();
 	}
 	
-	public HybridMethod(String wordnetPath, String wikiPath) {
-		super(wordnetPath, wikiPath);
+	public HybridMethod(String wikiPath, boolean ne) {
+		super(wikiPath, ne);
 		
-		novelMethod = new NovelMethod(null, null, dict(), parser(), gsFactory());
-		jiangMethod = new JiangMethod(null, null, dict(), parser(), gsFactory());
+		novelMethod = new NovelMethod(null, ne, dict(), parser(), gsFactory());
+		jiangMethod = new JiangMethod(null, ne, dict(), parser(), gsFactory());
 	}
 	
 	public ResultPair determineHypernym(WikiPage page) {

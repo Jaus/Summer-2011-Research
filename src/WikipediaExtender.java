@@ -20,13 +20,17 @@ import edu.stanford.nlp.parser.lexparser.*;
 import edu.stanford.nlp.trees.*;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.process.*;
+import edu.stanford.nlp.ie.AbstractSequenceClassifier;
+import edu.stanford.nlp.ie.crf.*;
 
 import Jama.Matrix;
 
 // dat class...
 public abstract class WikipediaExtender {
 
-	public static final String GRAMMAR_FILE = "/home/jaus/Documents/Java/stanford-parser-2011-06-19/grammar/englishFactored.ser.gz";
+	public static final String GRAMMAR_FILE = "data/englishFactored.ser.gz",
+	                           WORDNET_DICT = "data/WordNet-dict",
+	                         NER_CLASSIFIER = "data/all.3class.distsim.crf.ser.gz";
 	
 	public static final List<String> acronyms = Arrays.asList("Inc", "No", "ca", "lat");
 
@@ -35,6 +39,8 @@ public abstract class WikipediaExtender {
 	private TreebankLanguagePack tlp;
 	private GrammaticalStructureFactory gsf;
 	private WikiXMLParser wxsp;
+	private AbstractSequenceClassifier nerClassifier;
+	private boolean discardNE;
 	
 	POS[] posList;
 
@@ -56,9 +62,18 @@ public abstract class WikipediaExtender {
 		String title = page.getTitle();
 		title = title.substring(0, title.indexOf('\n'));
 		System.err.println(title);
+		
 		if (dict().getIndexWord(title, POS.NOUN) != null) {
 			System.err.println("Skipping because it is already in WordNet.");
 			return;
+		}
+
+		if (discardNE) {
+			String tagNE = nerClassifier.classifyToString(title);
+			if (tagNE.contains("PERSON") || tagNE.contains("LOCATION") || tagNE.contains("ORGANIZATION")) {
+				System.err.println("Skipping because named entity detected: " + tagNE);
+				return;
+			}
 		}
 		
 		ResultPair result = determineHypernym(page);
@@ -82,14 +97,14 @@ public abstract class WikipediaExtender {
 		if (added%50==0) System.err.println("Added: " + added);
 		if (seen%50==0)  System.err.println("Seen:  " + seen);
 	}
-	
-	public WikipediaExtender(String wordnetpath, String wikipediapath) {
-		this(wordnetpath, wikipediapath, null, null, null);
+
+	public WikipediaExtender(String wikipediapath, boolean ne) {
+		this(wikipediapath, ne, null, null, null);
 	}
 	
 	// pass in an existing copy of these resources to skip initialization
 	// null for wikipedia path causes the main loop to be suppressed
-	public WikipediaExtender(String wordnetpath, String wikipediapath, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
+	public WikipediaExtender(String wikipediapath, boolean ne, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
 	
 		added = 0;
 		seen = 0;
@@ -110,7 +125,7 @@ public abstract class WikipediaExtender {
 		// prepare WordNet
 		if (d == null) {
 			URL url = null;
-			try {url = new URL("file", null, wordnetpath);} 
+			try {url = new URL("file", null, WORDNET_DICT);} 
 			catch (MalformedURLException e) {e.printStackTrace();}
 			if (url == null) return;
 		
@@ -118,7 +133,12 @@ public abstract class WikipediaExtender {
 			try {dict.open();}
 			catch (IOException e) {e.printStackTrace();}
 		} else dict = d;
-		
+
+		// prepare NER classifier
+		discardNE = ne;
+		if (discardNE) nerClassifier = CRFClassifier.getClassifierNoExceptions(NER_CLASSIFIER);
+
+		// set up Wikipedia parser
 		if (wikipediapath != null) {
 			wxsp = WikiXMLParserFactory.getSAXParser(wikipediapath);
 		

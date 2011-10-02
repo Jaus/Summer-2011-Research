@@ -22,15 +22,15 @@ import edu.stanford.nlp.process.*;
 public class JiangMethod extends WikipediaExtender {
 
 	public static void main(String[] args) throws Exception {
-		new JiangMethod("/usr/local/WordNet-3.0/dict", args[0]).run();
+		new JiangMethod(args[0], Integer.valueOf(args[1])>0).run();
 	}
 	
-	public JiangMethod(String wordnetPath, String wikiPath) {
-		super(wordnetPath, wikiPath);
+	public JiangMethod(String wikiPath, boolean ne) {
+		super(wikiPath, ne);
 	}
 	
-	public JiangMethod(String wordnetpath, String wikipediapath, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
-		super(wordnetpath, wikipediapath, d, p, g);
+	public JiangMethod(String wikipediapath, boolean ne, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
+		super(wikipediapath, ne, d, p, g);
 	}
 	
 	public ResultPair determineHypernym(WikiPage page) {

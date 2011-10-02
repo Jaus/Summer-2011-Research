@@ -22,15 +22,15 @@ import edu.stanford.nlp.process.*;
 public class NovelMethod extends WikipediaExtender {
 
 	public static void main(String[] args) throws Exception {
-		new NovelMethod("/usr/local/WordNet-3.0/dict", args[0]).run();
+		new NovelMethod(args[0], Integer.valueOf(args[1])>0).run();
 	}
 	
-	public NovelMethod(String wordnetPath, String wikiPath) {
-		super(wordnetPath, wikiPath);
+	public NovelMethod(String wikiPath, boolean ne) {
+		super(wikiPath, ne);
 	}
 	
-	public NovelMethod(String wordnetpath, String wikipediapath, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
-		super(wordnetpath, wikipediapath, d, p, g);
+	public NovelMethod(String wikipediapath, boolean ne, edu.mit.jwi.Dictionary d, LexicalizedParser p, GrammaticalStructureFactory g) {
+		super(wikipediapath, ne, d, p, g);
 	}
 	
 	private TreeGraphNode getPOS(TreeGraphNode parent, String pos) {
