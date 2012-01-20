@@ -13,7 +13,9 @@ example, to run the hybrid method skipping named entities you would enter:
 
 	You will have to pass the path to the Wikipedia dump file to script/run. I have
 not included the dump file in the project because it is too large; you need to download
-it yourself.
+it yourself from:
+
+http://download.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2
 
 	You can also edit the amount of memory reserved for the JVM using the -Xmx option. I
 had to reduce it from the 3.5G it was using previously because my poor laptop only has 2G;
