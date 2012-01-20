@@ -9,11 +9,11 @@ or not (1 to skip, 0 not to). The programs print information to stderr that is n
 of the final output, so you should redirect stdout to a file to get clean output For
 example, to run the hybrid method skipping named entities you would enter:
 
-	> script/run HybridMethod 1 > /path/to/output/file.txt
+	> script/run HybridMethod /path/to/wiki/dump.xml 1 > /path/to/output/file.txt
 
-	You will have to edit script/run to use the correct path to the Wikipedia dump file
-on your system. I have not included the dump file in the project because of size concerns.
-The path should go in between the "$1" and "$2" in the script.
+	You will have to pass the path to the Wikipedia dump file to script/run. I have
+not included the dump file in the project because it is too large; you need to download
+it yourself.
 
 	You can also edit the amount of memory reserved for the JVM using the -Xmx option. I
 had to reduce it from the 3.5G it was using previously because my poor laptop only has 2G;
