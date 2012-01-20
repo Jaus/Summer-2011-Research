@@ -1,1 +1,1 @@
-java -Xmx1000M -cp classes:lib/ant.jar:lib/wikixmlj-r43.jar:lib/Jama-1.0.2.jar:lib/stanford-parser.jar:lib/jsimlib.jar:lib/stanford-ner.jar $1 /media/Storage_/Documents/wikipedia/enwiki-latest-pages-articles.xml.bz2 $2
+java -Xmx1000M -cp classes:lib/ant.jar:lib/wikixmlj-r43.jar:lib/Jama-1.0.2.jar:lib/stanford-parser.jar:lib/jsimlib.jar:lib/stanford-ner.jar $1 $2 $3
